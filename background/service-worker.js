@@ -22,7 +22,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (request.action === 'adaptText') {
-    adaptText(request.text, request.profile).then(sendResponse);
+    adaptText(request.text, request.profile, request.options || {}).then(sendResponse);
     return true; // Async response
   }
   
@@ -270,7 +270,56 @@ async function checkAIAvailability() {
 // IMPROVED TEXT ADAPTATION WITH RETRY
 // ==============================================================
 
-async function adaptText(text, profile) {
+async function adaptWithSummarizer(text, summaryLength = 'short') {
+  if (
+    typeof self === 'undefined' ||
+    !self.ai ||
+    !self.ai.summarizer ||
+    typeof self.ai.summarizer.create !== 'function'
+  ) {
+    return { success: false, reason: 'Summarizer API unavailable' };
+  }
+
+  const allowedLengths = ['short', 'medium', 'long'];
+  const lengthSetting = allowedLengths.includes(summaryLength) ? summaryLength : 'short';
+
+  try {
+    const summaryText = await retryWithBackoff(async () => {
+      const summarizer = await self.ai.summarizer.create({
+        type: 'key-points',
+        length: lengthSetting
+      });
+      try {
+        const response = await summarizer.summarize(text);
+        let output = '';
+        if (typeof response === 'string') {
+          output = response;
+        } else if (response) {
+          if (typeof response.summary === 'string') {
+            output = response.summary;
+          } else if (Array.isArray(response.highlights)) {
+            output = response.highlights.join('\n');
+          } else if (Array.isArray(response.summaries)) {
+            output = response.summaries.join('\n');
+          }
+        }
+        if (!output || output.trim().length === 0) {
+          throw new Error('Summarizer returned empty output');
+        }
+        return output;
+      } finally {
+        if (typeof summarizer.destroy === 'function') {
+          summarizer.destroy();
+        }
+      }
+    }, Math.min(CONFIG.MAX_RETRIES, 2), 'Summarizer Adaptation');
+    return { success: true, adaptedText: summaryText };
+  } catch (error) {
+    console.error('Summarizer adaptation failed:', error);
+    return { success: false, reason: error.message };
+  }
+}
+async function adaptText(text, profile, options = {}) {
   try {
     // Validate input
     if (!text || text.trim().length < 20) {
@@ -279,9 +328,34 @@ async function adaptText(text, profile) {
         reason: 'Text too short (minimum 20 characters)' 
       };
     }
+
+    const maxLength = 3000;
+    if (text.length > maxLength) {
+      text = truncateAtSentence(text, maxLength);
+    }
+
+    if (profile === 'adhd') {
+      const summarizerAttempt = await adaptWithSummarizer(
+        text,
+        options.adhdSummaryLength || 'short'
+      );
+      if (summarizerAttempt.success) {
+        console.log('ADHD adaptation using Summarizer API');
+        const adapted = summarizerAttempt.adaptedText;
+        return {
+          success: true,
+          adaptedText: adapted,
+          profile,
+          originalLength: text.length,
+          adaptedLength: adapted.length,
+          method: 'summarizer'
+        };
+      } else {
+        console.warn('Summarizer unavailable or failed, falling back to prompt:', summarizerAttempt.reason);
+      }
+    }
     
     // Smart text truncation (preserve sentence boundaries)
-    const maxLength = 3000;
     if (text.length > maxLength) {
       text = truncateAtSentence(text, maxLength);
     }
@@ -290,7 +364,7 @@ async function adaptText(text, profile) {
     const result = await retryWithBackoff(async () => {
       const session = await createSession();
       
-      const prompt = getPromptForProfile(profile, text);
+      const prompt = getPromptForProfile(profile, text, options);
       
       console.log(`Adapting text for ${profile} (${text.length} chars)...`);
       
@@ -379,7 +453,37 @@ function truncateAtSentence(text, maxLength) {
 // PROMPT GENERATION (unchanged, but documented)
 // ==============================================================
 
-function getPromptForProfile(profile, text) {
+function getPromptForProfile(profile, text, options = {}) {
+  const dyslexiaLevel = (options.dyslexiaLevel || 'medium').toLowerCase();
+  const simplificationGuidance = {
+    low: 'Mild simplification. Keep most original meaning and vocabulary, but clarify tricky phrases.',
+    medium: 'Balanced simplification. Use common words, keep key facts, and shorten sentences.',
+    high: 'Maximum simplification. Use very common words, very short sentences, and remove non-essential detail.'
+  };
+  const dyslexiaInstruction = simplificationGuidance[dyslexiaLevel] || simplificationGuidance.medium;
+
+  const adhdLength = (options.adhdSummaryLength || 'short').toLowerCase();
+  const adhdGuidance = {
+    short: 'Summaries must be brief (3-4 bullet points max). Focus only on essential facts.',
+    medium: 'Provide a medium-length summary (up to 6 bullet points) with key supporting facts.',
+    long: 'Provide a longer structured summary (up to 8 bullet points plus a short intro).'
+  };
+  const adhdInstruction = adhdGuidance[adhdLength] || adhdGuidance.short;
+  const gradeLevel = (options.gradeLevel || 'upper').toLowerCase();
+  const dyslexiaGradeGuidanceMap = {
+    lower: 'Audience: 1st-3rd grade. Write in uppercase, keep sentences extremely short (6-8 words), omit comprehension questions, and provide a simple Glossary section (word - meaning) with up to 3 entries.',
+    upper: 'Audience: 4th-6th grade. Keep sentences short (8-12 words), include one age-appropriate comprehension question after each paragraph, and provide a Glossary section with up to 4 entries (word - meaning).',
+    middle: 'Audience: 7th-8th grade. Use clear sentences (12-16 words), provide a thoughtful comprehension question after each paragraph, Glossary optional (max 2 entries if essential).'
+  };
+  const adhdGradeGuidanceMap = {
+    lower: 'Audience: 1st-3rd grade. Limit to 3 very short checklist steps in uppercase with concrete actions. Keep language simple and encouraging.',
+    upper: 'Audience: 4th-6th grade. Provide 3-4 concise checklist steps with direct actions or reminders appropriate for this age.',
+    middle: 'Audience: 7th-8th grade. Provide up to 5 focused checklist steps emphasising planning, organisation, and self-monitoring.'
+  };
+  const dyslexiaGradeGuidance = dyslexiaGradeGuidanceMap[gradeLevel] || dyslexiaGradeGuidanceMap.upper;
+  const adhdGradeGuidance = adhdGradeGuidanceMap[gradeLevel] || adhdGradeGuidanceMap.upper;
+  const includeDyslexiaQuestions = gradeLevel !== 'lower';
+
   const prompts = {
     dyslexia: `You are helping a student with dyslexia. Adapt this text based on scientific research on dyslexia and readability. You must rewrite the content so it follows every rule below.
 
@@ -399,6 +503,10 @@ SPECIFIC RULES:
 - Avoid metaphors, idioms, and ambiguous pronouns ("it", "this")
 - Keep active voice (e.g., "The dog chased the ball" not "The ball was chased")
 - Do not copy sentences or phrases verbatim from the original text
+- Simplification intensity: ${dyslexiaInstruction}
+- Grade guidance (instructions for you only, do NOT mention or reference this in the output): ${dyslexiaGradeGuidance}
+${includeDyslexiaQuestions ? '- After each paragraph, append a short comprehension question on a new line that begins with "Question:".' : ''}
+- Never include text such as "Grade guidance" or any sentence describing these instructions.
 
 FORMATTING MARKERS (for CSS styling):
 - Use **bold** for key terms (wrap in asterisks)
@@ -421,22 +529,33 @@ RULES:
 - Use bold for the most important information (use **text** format)
 - Keep paragraphs very short (3-4 sentences max)
 - Remove unnecessary details
+- Formatting guidance: ${adhdInstruction}
+- Present actionable steps as checklist items the student can tick off.
+- Grade guidance (instructions for you only, do NOT mention or reference this in the output): ${adhdGradeGuidance}
+- Do not add text like "Quick check" unless explicitly requested elsewhere.
+- Never include text such as "Grade guidance" or any sentence describing these instructions.
 
 TEXT TO ADAPT:
 ${text}
 
 ADAPTED TEXT:`,
 
-    autism: `You are helping a student on the autism spectrum. Adapt the following text for clear understanding:
+    autism: `You are helping a student on the autism spectrum (low functioning). Adapt the following text for clear understanding.
 
-RULES:
-- Use literal, concrete language (no metaphors, idioms, or figurative speech)
-- If there are metaphors or idioms, explain them literally
-- Provide explicit, step-by-step instructions when needed
-- Use clear structure with numbered lists
-- Avoid ambiguous language
-- Be consistent in terminology
-- Explain any abstract concepts in concrete terms
+PRINCIPLES:
+- Use literal, concrete language only. Remove or rewrite metaphors, idioms, sarcasm, exaggeration, and rhetorical devices.
+- Keep sentences short (10-14 words) and direct. State the subject first.
+- Use the same term every time for the same idea. Avoid pronouns like "it" or "they" unless the referent is explicit.
+- Explain actions step-by-step when instructions are present.
+
+OUTPUT SECTIONS (in this order):
+1. Literal Rewrite:
+   - Present the adapted content in plain paragraphs.
+   - Highlight key facts with **bold** when essential for meaning.
+   - Do not add new information.
+2. Page Overview:
+   - Provide a bullet list (•) describing what appears on the web page (headings, sections, media, links).
+   - Each bullet should mention where the information appears and what it contains.
 
 TEXT TO ADAPT:
 ${text}

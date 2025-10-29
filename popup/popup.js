@@ -8,6 +8,9 @@ const resetBtn = document.getElementById('resetBtn');
 const autoAdaptCheckbox = document.getElementById('autoAdapt');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
+const dyslexiaLevelSelect = document.getElementById('dyslexiaLevel');
+const adhdSummarySelect = document.getElementById('adhdSummaryLength');
+const gradeLevelSelect = document.getElementById('gradeLevel');
 
 // State
 let selectedProfile = 'none';
@@ -16,15 +19,39 @@ let aiAvailable = false;
 // Initialize
 async function init() {
   // Load saved settings
-  const settings = await chrome.storage.sync.get(['profile', 'autoAdapt']);
+  const settings = await chrome.storage.sync.get([
+    'profile',
+    'autoAdapt',
+    'dyslexiaLevel',
+    'adhdSummaryLength',
+    'gradeLevel'
+  ]);
   selectedProfile = settings.profile || 'none';
   autoAdaptCheckbox.checked = settings.autoAdapt || false;
+  dyslexiaLevelSelect.value = settings.dyslexiaLevel || 'medium';
+  adhdSummarySelect.value = settings.adhdSummaryLength || 'short';
+  gradeLevelSelect.value = settings.gradeLevel || 'upper';
   
   // Update UI
   updateSelectedProfile(selectedProfile);
   
   // Check AI availability
   checkAIAvailability();
+}
+
+function toggleOptionAvailability(profile) {
+  const forDyslexia = profile === 'dyslexia';
+  const forADHD = profile === 'adhd';
+  dyslexiaLevelSelect.disabled = !forDyslexia;
+  adhdSummarySelect.disabled = !forADHD;
+}
+
+function getSelectedOptions() {
+  return {
+    dyslexiaLevel: dyslexiaLevelSelect.value || 'medium',
+    adhdSummaryLength: adhdSummarySelect.value || 'short',
+    gradeLevel: gradeLevelSelect.value || 'upper'
+  };
 }
 
 // Check if Chrome AI is available
@@ -65,6 +92,7 @@ function updateSelectedProfile(profile) {
       card.classList.remove('selected');
     }
   });
+  toggleOptionAvailability(profile);
 }
 
 // Profile selection
@@ -94,7 +122,7 @@ adaptBtn.addEventListener('click', async () => {
   
   // Show loading state
   adaptBtn.disabled = true;
-  adaptBtn.innerHTML = '<span class="btn-icon">⏳</span> Adapting...';
+  adaptBtn.textContent = 'Preparing adaptations…';
   
   try {
     // Get active tab
@@ -103,7 +131,8 @@ adaptBtn.addEventListener('click', async () => {
     // Better approach:
     const result = await chrome.tabs.sendMessage(tab.id, {
       action: 'adaptPage',
-      profile: selectedProfile
+      profile: selectedProfile,
+      options: getSelectedOptions()
     });
 
     if (!result || !result.success) {
@@ -111,16 +140,16 @@ adaptBtn.addEventListener('click', async () => {
     }
     
     // Success
-    adaptBtn.innerHTML = '<span class="btn-icon">✓</span> Adapted!';
+    adaptBtn.textContent = 'Adaptations ready';
     
     setTimeout(() => {
-      adaptBtn.innerHTML = '<span class="btn-icon">✨</span> Adapt Current Page';
+      adaptBtn.textContent = 'Apply adaptations';
       adaptBtn.disabled = false;
     }, 2000);
     
   } catch (error) {
     console.error('Error adapting page:', error);
-    adaptBtn.innerHTML = '<span class="btn-icon">✗</span> Error';
+    adaptBtn.textContent = 'Adaptation failed';
     adaptBtn.disabled = false;
     alert('Error adapting page. Please refresh and try again.');
   }
@@ -145,6 +174,24 @@ resetBtn.addEventListener('click', async () => {
 autoAdaptCheckbox.addEventListener('change', async () => {
   await chrome.storage.sync.set({ autoAdapt: autoAdaptCheckbox.checked });
   console.log('Auto-adapt:', autoAdaptCheckbox.checked);
+});
+
+dyslexiaLevelSelect.addEventListener('change', async () => {
+  const value = dyslexiaLevelSelect.value || 'medium';
+  await chrome.storage.sync.set({ dyslexiaLevel: value });
+  console.log('Dyslexia simplification level:', value);
+});
+
+adhdSummarySelect.addEventListener('change', async () => {
+  const value = adhdSummarySelect.value || 'short';
+  await chrome.storage.sync.set({ adhdSummaryLength: value });
+  console.log('ADHD summary length:', value);
+});
+
+gradeLevelSelect.addEventListener('change', async () => {
+  const value = gradeLevelSelect.value || 'upper';
+  await chrome.storage.sync.set({ gradeLevel: value });
+  console.log('Grade level:', value);
 });
 
 // Help link

@@ -1,338 +1,156 @@
-# EduAdapt - AI-Powered Learning Accessibility
+# EduAdapt – Chrome AI Accessibility Companion
 
-**Make the web accessible for students with learning differences using Chrome's built-in AI.**
+**Demo extension that explores how Chrome’s on-device Gemini Nano model can reshape web pages for students with diverse learning needs.**
 
-[![Chrome Built-in AI Challenge 2025](https://img.shields.io/badge/Chrome%20AI-Challenge%202025-blue)](https://googlechromeai2025.devpost.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Chrome Built-in AI Challenge 2025](https://img.shields.io/badge/Chrome%20AI-Challenge%202025-blue)](https://googlechromeai2025.devpost.com/)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 
----
-
-## What is EduAdapt?
-
-EduAdapt is a Chrome extension that adapts web content in real-time for students with learning differences such as **dyslexia**, **ADHD**, and **autism spectrum disorder**. 
-
-Unlike existing accessibility tools that only modify fonts and colors, **EduAdapt uses Chrome's built-in AI (Gemini Nano)** to intelligently rewrite and restructure content, making it easier to understand while preserving the original meaning.
-**Please note:** This extension is a demonstration project. The learning profile adaptations are based on strategies identified through AI-assisted research of scientific literature and are intended for illustrative purposes only. A production-ready version would require collaboration with education specialists, accessibility experts, and individuals from the neurodivergent community to ensure accuracy and effectiveness.
-
-### ✨ Key Features
-
-- **On-Device AI**: Powered by Gemini Nano (Chrome Built-in AI)
-- **100% Private**: All processing happens locally on your device
-- **Works Offline**: No internet required after initial setup
-- **Completely Free**: No API costs, no subscriptions
-- **Fast**: Instant adaptations with local AI
-- **Multiple Profiles**: Dyslexia, ADHD, Autism support
+> ⚠️ **Important:** EduAdapt is a prototype. The learning strategies have been compiled through AI-assisted research and iterative feedback from a doctoral researcher in special education. They illustrate an approach and are **not** a substitute for professional recommendations, classroom accommodations, or clinical interventions. Any real-world deployment must be co-designed with teachers, caregivers, and neurodivergent learners.
 
 ---
 
-## 🎯 Learning Profiles
+## Why EduAdapt?
 
-### 👁️ **Dyslexia Mode**
+Most accessibility extensions tweak fonts and colors. EduAdapt goes further by:
 
-**Visual & Content Adaptations:**
-- ✅ Dyslexia-friendly font (Comic Sans / OpenDyslexic)
-- ✅ Increased letter spacing & line height
-- ✅ Simple vocabulary (replaces complex words)
-- ✅ Short sentences (max 10-12 words)
-- ✅ Clear paragraph structure
-- ✅ Beige background (#faf8f3) with dark gray text
-
-**Example:**
-```
-Before: "The implementation of photosynthesis involves the 
-transformation of light energy into chemical energy through 
-a series of complex biochemical reactions."
-
-After: "Plants make food using sunlight.
-
-Here's how:
-• Light hits the plant
-• Plant changes light into energy  
-• Plant uses energy to grow"
-```
-
-### 🎯 **ADHD Mode**
-
-**Content & Visual Adaptations:**
-- ✅ TL;DR summaries at the top
-- ✅ Bold key points (**important** text)
-- ✅ Short paragraphs (3-4 sentences max)
-- ✅ Bullet points for lists
-- ✅ Highlighted headings (yellow background)
-- ✅ Removed distractions & simplified layout
-
-**Example:**
-```
-⚡ QUICK SUMMARY (30 sec):
-Climate change is warming Earth. Ice melts, seas rise. 
-We must act now.
-
-📊 KEY POINTS:
-• **Temperature rising** globally
-• **Ice caps melting** faster
-• **Action needed** immediately
-
-[Full article continues...]
-```
-
-### 🧩 **Autism Spectrum Mode**
-
-**Language & Structure Adaptations:**
-- ✅ Literal language (no metaphors/idioms)
-- ✅ Explicit explanations of figurative speech
-- ✅ Step-by-step numbered instructions
-- ✅ Consistent terminology
-- ✅ No animations or sudden changes
-- ✅ Clear, predictable structure
-
-**Example:**
-```
-Before: "It's raining cats and dogs! Better grab an umbrella 
-or you'll be soaked."
-
-After: "It is raining very heavily.
-This means a lot of water is falling from the sky.
-
-What to do:
-1. Take an umbrella
-2. Wear a raincoat  
-3. This will keep you dry
-
-Why? Heavy rain makes you wet if you don't protect yourself."
-```
+- Using **Chrome’s built-in Gemini Nano** to rewrite content locally (no external API calls, no data leaves the device).
+- Generating **dynamic, research-inspired teaching supports**: simplified rewrites, checklists, comprehension prompts, literal explanations.
+- Allowing teachers to **dial in grade bands** (1–3, 4–6, 7–8) so language difficulty, follow-up questions, and vocabulary supports match age expectations.
+- Keeping the original article visible so students and educators can compare source vs. adapted text.
 
 ---
 
-## 🚀 Installation
+## Core Features
+
+| Capability | How it Helps | Notes |
+|------------|--------------|-------|
+| **Profile-aware rewrites** | Tailors text for Dyslexia, ADHD, or Autism Spectrum learners. | All logic runs in `background/service-worker.js` with Gemini Nano. |
+| **Grade bands** (1–3, 4–6, 7–8) | Adjusts tone, question complexity, typography, and glossary use. | Selectable in the popup; stored with `chrome.storage.sync`. |
+| **Teacher-oriented UI** | Clean dashboard with embedded profile settings + grade selector. | `popup/popup.html`, `popup/popup.js` |
+| **Dynamic support sections** | Dyslexia mode adds expandable panels with simplified paragraphs + comprehension question. | Prefetch queue avoids blocking on huge sections. |
+| **Quick overview for focus** | ADHD mode creates an instant “Quick Overview” banner and bullet checklist with checkboxes. | Summary uses the Summarizer API when available, with fast placeholders. |
+| **Literal rewrites + page map** | Autism mode outputs literal paragraphs plus a bullet overview of page sections. | First paragraphs appear quickly; remaining sections stream in batches. |
+| **Interactive glossary** | Middle/upper grades see hoverable word definitions that come directly from the AI rewrite. | Glossary tooltips trigger on keyboard focus too. |
+
+---
+
+## Learning Profiles Explained (with research rationale)
+
+The extension encodes strategies relayed by a PhD researcher who studies neurodivergent literacy. Each feature exists to demonstrate the approach.
+
+### Dyslexia Support
+
+- **Typography tuned to research:** 0.20em letter spacing, 2.0 line height, sans-serif font stack (Arial/Verdana/Helvetica Neue), warm background (#faf8f3).
+- **Simplified companion text:** Every paragraph can expand into a rewritten version with short sentences, concrete vocabulary, and bolded focus terms.
+- **Comprehension prompts:** After each simplified paragraph a “Question:” line probes understanding (grades 4–8). Grade 1–3 suppresses questions and converts text to uppercase.
+- **Glossary pop-ups:** Grades 1–6 receive a word bank with hover/click definitions. Grade 1–3 keeps lower-case definitions while the paragraph text is uppercase.
+- **Prefetch queue with safeguards:** Short sections preload so buttons feel instant; longer articles ( >1200 chars) are deferred until clicked to prevent long waits.
+
+### ADHD Support
+
+- **Quick Overview banner:** A lightweight first-sentence placeholder appears immediately while the Summarizer API processes a richer summary.
+- **Checklist workflow:** The main content is converted into checkable tasks, encouraging active reading and self-monitoring.
+- **Grade-aware tone:** Lower grades use uppercase action steps; middle schoolers see planning-oriented statements with stronger metacognitive wording.
+- **Distraction trims:** Headings retain high contrast, paragraphs are chunked, and only the first screenful of sections loads synchronously.
+
+### Autism Spectrum Support (low functioning)
+
+- **Literal-only language:** Figurative speech is rewritten or explained explicitly; pronouns are resolved to concrete nouns.
+- **Structured delivery:** Large pages convert into small batches so readers get content right away, with placeholders indicating what’s loading.
+- **Page map:** A bullet list outlines main sections (useful for previewing or recapping).
+- **Consistent pace:** Animations and transitions are removed, and typography stays stable to reduce sensory load.
+
+---
+
+## Grade Bands & Tuning Controls
+
+| Grade Band | Popup label | Dyslexia behaviour | ADHD behaviour | Autism behaviour |
+|------------|-------------|--------------------|----------------|------------------|
+| **1st – 3rd** | “1st – 3rd grade” | Entire adaptation in uppercase, no questions, glossary limited to three core words. | 2–3 uppercase checklist items, very short sentences. | Literal rewrite still lowercase to maximise legibility. |
+| **4th – 6th** | “4th – 6th grade” | Comprehension question after each paragraph, glossary with up to four entries. | 3–4 checklist items with brief encouragement. | Literal rewrite + page overview, standard casing. |
+| **7th – 8th** | “7th – 8th grade” | More reflective questions (styled differently), glossary optional (max two entries). | Up to 5 checklist items focused on planning, future steps. | Same as above, but sentences can be slightly longer. |
+
+All selections (profile, grade band, dyslexia simplification level, ADHD summary length, auto-adapt toggle) persist across browsing sessions.
+
+---
+
+## Installation & Setup
 
 ### Prerequisites
 
-**Chrome Version:** 138+ (Dev, Canary, or Stable)
-
-**Enable Chrome AI:**
-
-1. Go to `chrome://flags/#prompt-api-for-gemini-nano`
-   - Set to: **Enabled**
-
-2. Go to `chrome://flags/#optimization-guide-on-device-model`
-   - Set to: **Enabled BypassPerfRequirement**
-
-3. **Restart Chrome**
-
-4. Go to `chrome://components/`
-   - Find "Optimization Guide On Device Model"
-   - Click "Check for update"
-   - Wait for Gemini Nano to download (~1.5 GB, one-time)
-
-5. Verify in Console (F12):
-   ```javascript
-   await LanguageModel.availability()
-   // Should return: "readily"
+1. **Chrome 138+** (Dev, Canary, or Stable once Gemini Nano GA).  
+2. Enable flags:  
+   - `chrome://flags/#prompt-api-for-gemini-nano` → **Enabled**  
+   - `chrome://flags/#optimization-guide-on-device-model` → **Enabled BypassPerfRequirement**  
+3. Restart Chrome, visit `chrome://components/`, locate **Optimization Guide On Device Model** and “Check for update”. Wait for the on-device Gemini download (~1.5 GB).  
+4. Verify availability in DevTools console:
+   ```js
+   await LanguageModel.availability(); // "readily" or "available"
    ```
 
-### Install Extension
-
-**Option 1: From Chrome Web Store** (Coming Soon)
-
-**Option 2: Load Unpacked (Development)**
-
-1. Download/Clone this repository
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" (top right)
-4. Click "Load unpacked"
-5. Select the `eduadapt` folder
-6. The extension icon should appear in your toolbar!
-
----
-
-## 📖 How to Use
-
-### Quick Start
-
-1. **Click the EduAdapt icon** in your Chrome toolbar
-2. **Select a learning profile** (Dyslexia, ADHD, or Autism)
-3. **Click "Adapt Current Page"**
-4. Wait 5-10 seconds for AI to process
-5. **Page is now adapted!**
-
-### Auto-Adapt Mode
-
-Enable "Auto-adapt all pages" in the popup to automatically adapt every page you visit.
-
-### Reset a Page
-
-Click "Reset Page" to restore original content.
-
----
-
-## 🛠️ Technical Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│           Chrome Extension UI                │
-│         (popup/popup.html)                   │
-└────────────────┬────────────────────────────┘
-                 │
-                 │ User selects profile
-                 ├─────────────────────────────┐
-                 │                             │
-        ┌────────▼────────┐          ┌────────▼────────┐
-        │  Content Script │          │ Service Worker  │
-        │  (content.js)   │◄─────────┤  (AI Backend)   │
-        └────────┬────────┘          └────────┬────────┘
-                 │                             │
-                 │ Extract text                │ AI Processing
-                 │                             │
-                 ├─────────────────────────────┤
-                 │                             │
-                 │          Gemini Nano        │
-                 │       (LanguageModel API)   │
-                 │                             │
-                 └─────────────┬───────────────┘
-                               │
-                               │ Adapted text
-                               │
-                      ┌────────▼────────┐
-                      │   Web Page DOM  │
-                      │   (Modified)    │
-                      └─────────────────┘
-```
-
-### Key Components
-
-- **popup/**: User interface (HTML/CSS/JS)
-- **background/**: Service worker with AI logic
-- **content/**: Page modification scripts
-- **utils/**: Helper functions & profiles
-
-### AI Processing Flow
-
-1. User clicks "Adapt Page"
-2. Content script extracts text from main content
-3. Text sent to service worker
-4. Service worker uses LanguageModel.create() with profile-specific prompts
-5. Gemini Nano processes text locally
-6. Adapted text returned to content script
-7. DOM updated with new content + CSS styling
-
----
-
-## 🎨 Profile Prompts
-
-Each profile uses carefully crafted prompts to guide Gemini Nano:
-
-### Dyslexia Prompt
-```javascript
-"You are helping a student with dyslexia. Adapt the text:
-- Use simple, common words
-- Write short sentences (max 10-12 words)
-- Break long paragraphs into smaller ones
-- Use bullet points for lists
-- Keep the same meaning"
-```
-
-### ADHD Prompt
-```javascript
-"You are helping a student with ADHD. Adapt the text:
-- Start with a brief summary
-- Use clear headings
-- Break into small chunks
-- Highlight key points
-- Keep paragraphs very short (3-4 sentences)"
-```
-
-### Autism Prompt
-```javascript
-"You are helping a student on the autism spectrum:
-- Use literal language (no metaphors/idioms)
-- Explain figurative expressions literally
-- Provide step-by-step instructions
-- Avoid ambiguous language
-- Be consistent in terminology"
-```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! This project was created for the **Chrome Built-in AI Challenge 2025**.
-
-### Ideas for Contributions
-
-- [ ] Add more learning profiles (e.g., visual impairment, dysgraphia)
-- [ ] Multilingual support (ES, JA)
-- [ ] Custom profile creator
-- [ ] Browser extension for Firefox/Edge
-- [ ] Export adapted content to PDF/DOCX
-- [ ] Teacher collaboration features
-- [ ] Content templates library
-
-### Development Setup
+### Load the Extension
 
 ```bash
-git clone https://github.com/your-username/eduadapt.git
+git clone https://github.com/your-account/eduadapt.git
 cd eduadapt
-# Load unpacked in chrome://extensions
 ```
 
----
-
-## 🐛 Known Limitations
-
-- **Processing Time**: Complex pages take 5-10 seconds
-- **Model Size**: Gemini Nano is small (~1.5 GB), not as powerful as GPT-4
-- **Context Limit**: Max ~3000 words per adaptation
-- **Languages**: Best results with English (ES, JA supported but limited)
-- **Browser**: Chrome 138+ only (Dev/Canary/Stable)
-- **Platform**: Desktop only (no mobile support yet)
+1. Visit `chrome://extensions/`  
+2. Enable **Developer mode**  
+3. Click **Load unpacked** → choose the `eduadapt` folder  
+4. Pin the EduAdapt icon for quick access
 
 ---
 
-## 📚 Research & Resources
+## Using EduAdapt
 
-### Learning Differences
-- [International Dyslexia Association](https://dyslexiaida.org/)
-- [CHADD - ADHD Resources](https://chadd.org/)
-- [Autism Society](https://autismsociety.org/)
+1. Click the toolbar icon.  
+2. Choose a grade band (defaults to 4th–6th).  
+3. Select Dyslexia / ADHD / Autism (or “No adjustments”).  
+4. Tailor profile options (e.g., dyslexia simplification level).  
+5. Hit **Apply adaptations**. The content script (`content/content.js`) extracts paragraph blocks, calls the background service worker for AI rewrites, and streams results onto the page.  
+6. Use **Restore original page** to revert.
 
-### Chrome Built-in AI
-- [Chrome AI Documentation](https://developer.chrome.com/docs/ai)
-- [Gemini Nano Overview](https://deepmind.google/technologies/gemini/nano/)
-- [Early Preview Program](https://developer.chrome.com/docs/ai/built-in)
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file.
+Tip: Enable **Auto-adapt all pages** for continuous support (stored with `chrome.storage.sync`).
 
 ---
 
-## 👥 Authors
+## Architecture Snapshot
 
-- **Your Name** - *Initial work* - [@yourhandle](https://github.com/yourhandle)
+```
+popup (UI) ─┬─> content script (page extraction + rendering)
+            │
+            └─> service worker (background AI orchestration)
+                  ├─ Gemini Nano Prompt API (general rewrites)
+                  ├─ Summarizer API (ADHD quick overview)
+                  └─ Per-profile prompt templates + retry logic
+```
 
-Created for the **Chrome Built-in AI Challenge 2025** 🏆
-
----
-
-## 🙏 Acknowledgments
-
-- Google Chrome team for Built-in AI APIs
-- Gemini Nano for on-device AI
-- Educators and students who inspired this project
-- Accessibility advocates worldwide
-
----
-
-## 📞 Support
-
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-username/eduadapt/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-username/eduadapt/discussions)
-- 📧 **Email**: your-email@example.com
+- **Prefetch queue** in `content/content.js` handles dyslexia sections (parallel limit + size guard).  
+- **Glossary + grade styling** is injected as CSS in `applyCSSForProfile`.  
+- **Retry + session caching** lives in the service worker to manage Gemini sessions efficiently.
 
 ---
 
-**Made with ❤️ for accessible education**
+## Roadmap & Next Steps
 
-*"Education is the most powerful weapon which you can use to change the world." - Nelson Mandela*
+- Grade-aware controls (1–3, 4–6, 7–8). (done)
+- Placeholder-first loading for ADHD/autism to improve perceived speed.  (done)
+- Speed up the process to mrpove the user experience for student (to do)
+- Integrate Rewriter API for dyslexia once origin trial token is available. (to do)
+- Gather qualitative feedback from educators and students. (to do)
+- Package for Chrome Web Store with permissions review. (to do)
+
+---
+
+## Acknowledgements
+
+- Guidance on literacy strategies from a doctoral researcher specialising in dyslexia, ADHD, and autism support.  
+- Chrome Built-in AI team for shipping on-device Gemini Nano tooling.  
+- Community resources from the British Dyslexia Association, CAST UDL, and W3C Accessibility guidelines that informed the baseline typography and spacing choices.
+
+---
+
+## License
+
+MIT © 2025 EduAdapt contributors. See [LICENSE.txt](LICENSE.txt) for details.
