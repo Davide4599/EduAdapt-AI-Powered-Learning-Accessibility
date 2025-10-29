@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduAdapt</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🎓 EduAdapt</h1>
+      <p class="tagline">AI-Powered Learning Accessibility</p>
+    </div>
+
+    <!-- Status Indicator -->
+    <div class="status" id="status">
+      <div class="status-indicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Checking AI...</span>
+      </div>
+    </div>
+
+    <!-- Profile Selection -->
+    <div class="profiles-section">
+      <h2>Select Learning Profile</h2>
+      
+      <div class="profile-card" data-profile="none">
+        <div class="profile-header">
+          <span class="profile-icon">✖️</span>
+          <span class="profile-name">No Adaptation</span>
+        </div>
+        <p class="profile-desc">Browse normally without modifications</p>
+      </div>
+
+      <div class="profile-card" data-profile="dyslexia">
+        <div class="profile-header">
+          <span class="profile-icon">👁️</span>
+          <span class="profile-name">Dyslexia</span>
+        </div>
+        <p class="profile-desc">
+          • Simple words & short sentences<br>
+          • Increased spacing & dyslexia-friendly font<br>
+          • Clear structure with bullet points
+        </p>
+      </div>
+
+      <div class="profile-card" data-profile="adhd">
+        <div class="profile-header">
+          <span class="profile-icon">🎯</span>
+          <span class="profile-name">ADHD</span>
+        </div>
+        <p class="profile-desc">
+          • Quick summaries & key points<br>
+          • Highlighted important info<br>
+          • Chunked content with progress tracking
+        </p>
+      </div>
+
+      <div class="profile-card" data-profile="autism">
+        <div class="profile-header">
+          <span class="profile-icon">🧩</span>
+          <span class="profile-name">Autism Spectrum</span>
+        </div>
+        <p class="profile-desc">
+          • Literal language (no metaphors)<br>
+          • Explicit step-by-step instructions<br>
+          • Consistent structure & clear expectations
+        </p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button id="adaptBtn" class="btn btn-primary" disabled>
+        <span class="btn-icon">✨</span>
+        Adapt Current Page
+      </button>
+      <button id="resetBtn" class="btn btn-secondary">
+        <span class="btn-icon">🔄</span>
+        Reset Page
+      </button>
+    </div>
+
+    <!-- Settings Toggle -->
+    <div class="settings-toggle">
+      <label class="toggle-label">
+        <input type="checkbox" id="autoAdapt">
+        <span class="toggle-slider"></span>
+        <span class="toggle-text">Auto-adapt all pages</span>
+      </label>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Powered by Chrome Built-in AI (Gemini Nano)</p>
+      <a href="#" id="helpLink">Help & Documentation</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

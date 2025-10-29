@@ -1,0 +1,21 @@
+/* Content Script Styles - EduAdapt */
+
+/* Base adaptations */
+.eduadapt-adapted {
+  transition: all 0.3s ease;
+}
+
+.eduadapt-list {
+  list-style-type: disc;
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.eduadapt-list li {
+  margin: 0.5em 0;
+}
+
+/* Smooth transitions */
+body.eduadapt-active {
+  transition: background-color 0.5s ease, color 0.5s ease;
+}
