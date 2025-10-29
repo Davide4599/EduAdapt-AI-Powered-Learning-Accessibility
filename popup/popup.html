@@ -10,8 +10,8 @@
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <h1>🎓 EduAdapt</h1>
-      <p class="tagline">AI-Powered Learning Accessibility</p>
+      <h1>EduAdapt</h1>
+      <p class="tagline">Tailored reading supports for your students</p>
     </div>
 
     <!-- Status Indicator -->
@@ -22,51 +22,76 @@
       </div>
     </div>
 
+    <!-- Grade Selection -->
+    <div class="grade-settings">
+      <label for="gradeLevel" class="grade-label">
+        Student grade band
+        <span class="grade-hint">Adjusts question style, vocabulary support, and typography.</span>
+      </label>
+      <select id="gradeLevel" class="grade-select">
+        <option value="lower">1st – 3rd grade</option>
+        <option value="upper">4th – 6th grade</option>
+        <option value="middle">7th – 8th grade</option>
+      </select>
+    </div>
+
     <!-- Profile Selection -->
     <div class="profiles-section">
-      <h2>Select Learning Profile</h2>
+      <h2>Choose a support profile</h2>
       
       <div class="profile-card" data-profile="none">
         <div class="profile-header">
-          <span class="profile-icon">✖️</span>
-          <span class="profile-name">No Adaptation</span>
+          <span class="profile-name">No adjustments</span>
         </div>
-        <p class="profile-desc">Browse normally without modifications</p>
+        <p class="profile-summary">Keep the original page without any changes.</p>
       </div>
 
       <div class="profile-card" data-profile="dyslexia">
         <div class="profile-header">
-          <span class="profile-icon">👁️</span>
-          <span class="profile-name">Dyslexia</span>
+          <span class="profile-name">Dyslexia support</span>
         </div>
-        <p class="profile-desc">
-          • Simple words & short sentences<br>
-          • Increased spacing & dyslexia-friendly font<br>
-          • Clear structure with bullet points
+        <p class="profile-summary">
+          Applies research-based spacing and fonts, and provides simplified companion text.
         </p>
+        <div class="profile-options">
+          <label for="dyslexiaLevel" class="profile-label">
+            Simplification level
+            <span class="profile-hint">Saved automatically for next time.</span>
+          </label>
+          <select id="dyslexiaLevel" class="profile-select">
+            <option value="low">Low – gentle editing</option>
+            <option value="medium">Medium – balanced</option>
+            <option value="high">High – maximum simplification</option>
+          </select>
+        </div>
       </div>
 
       <div class="profile-card" data-profile="adhd">
         <div class="profile-header">
-          <span class="profile-icon">🎯</span>
-          <span class="profile-name">ADHD</span>
+          <span class="profile-name">Attention support (ADHD)</span>
         </div>
-        <p class="profile-desc">
-          • Quick summaries & key points<br>
-          • Highlighted important info<br>
-          • Chunked content with progress tracking
+        <p class="profile-summary">
+          Creates key-point summaries, highlights essentials, and breaks long text into shorter sections.
         </p>
+        <div class="profile-options">
+          <label for="adhdSummaryLength" class="profile-label">
+            Summary length
+            <span class="profile-hint">Sets how much detail appears in the overview.</span>
+          </label>
+          <select id="adhdSummaryLength" class="profile-select">
+            <option value="short">Short – quick scan</option>
+            <option value="medium">Medium – added context</option>
+            <option value="long">Long – fuller overview</option>
+          </select>
+        </div>
       </div>
 
       <div class="profile-card" data-profile="autism">
         <div class="profile-header">
-          <span class="profile-icon">🧩</span>
-          <span class="profile-name">Autism Spectrum</span>
+          <span class="profile-name">Autism spectrum support</span>
         </div>
-        <p class="profile-desc">
-          • Literal language (no metaphors)<br>
-          • Explicit step-by-step instructions<br>
-          • Consistent structure & clear expectations
+        <p class="profile-summary">
+          Focuses on low-functioning autism needs: removes figurative language, uses literal sentences, and adds a bullet summary of page contents.
         </p>
       </div>
     </div>
@@ -74,15 +99,13 @@
     <!-- Actions -->
     <div class="actions">
       <button id="adaptBtn" class="btn btn-primary" disabled>
-        <span class="btn-icon">✨</span>
-        Adapt Current Page
+        Apply adaptations
       </button>
       <button id="resetBtn" class="btn btn-secondary">
-        <span class="btn-icon">🔄</span>
-        Reset Page
+        Restore original page
       </button>
     </div>
-
+    
     <!-- Settings Toggle -->
     <div class="settings-toggle">
       <label class="toggle-label">
@@ -94,8 +117,8 @@
 
     <!-- Footer -->
     <div class="footer">
-      <p>Powered by Chrome Built-in AI (Gemini Nano)</p>
-      <a href="#" id="helpLink">Help & Documentation</a>
+      <p>Powered by Chrome built-in AI (Gemini Nano)</p>
+      <a href="#" id="helpLink">Teacher guide & documentation</a>
     </div>
   </div>
 
