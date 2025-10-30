@@ -33,8 +33,7 @@ eduadapt/
     │
     └── profiles/                 # Learning profile definitions (future)
         ├── dyslexia.json        # Dyslexia profile config (TODO)
-        ├── adhd.json            # ADHD profile config (TODO)
-        └── autism.json          # Autism profile config (TODO)
+        └── adhd.json            # ADHD profile config (TODO)
 ```
 
 ## 🔑 Key Files Explained
@@ -142,7 +141,7 @@ Approximate sizes:
 - [x] Extension structure
 - [x] Popup UI
 - [x] AI integration (Gemini Nano)
-- [x] All 3 profiles (Dyslexia, ADHD, Autism)
+- [x] Profiles (Dyslexia, ADHD)
 - [x] Content modification
 - [x] CSS styling per profile
 - [x] State management

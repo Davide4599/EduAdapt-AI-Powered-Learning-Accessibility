@@ -261,20 +261,86 @@ function createADHDQuickSummary(paragraphs, mainElement, options) {
   if (!summarySource) {
     return;
   }
-  
+
+  const queuedSections = Math.max(1, paragraphs.length);
+  const totalWords = paragraphs.reduce((count, para) => {
+    const text = (para && para.originalText) || '';
+    if (!text.trim()) {
+      return count;
+    }
+    return count + text.trim().split(/\s+/).length;
+  }, 0);
+  const estimatedMinutes = totalWords / 160;
+  let estimatedLabel = 'under a minute';
+  if (estimatedMinutes >= 1) {
+    estimatedLabel = `~${Math.max(1, Math.round(estimatedMinutes))} min`;
+  } else if (totalWords > 0) {
+    const seconds = Math.max(20, Math.round(estimatedMinutes * 60));
+    estimatedLabel = `~${seconds} sec`;
+  }
+
+  const headingCandidate =
+    (document.querySelector('main h1, article h1, header h1, h1') || document.querySelector('title'))?.textContent ||
+    document.title ||
+    'Current page';
+  const trimmedHeading = headingCandidate.trim().slice(0, 60);
+  const focusTopic = escapeHtml(trimmedHeading.length >= headingCandidate.trim().length ? trimmedHeading : `${trimmedHeading}…`);
+
   const summaryContainer = document.createElement('div');
   summaryContainer.className = 'eduadapt-adhd-summary';
-  const initialBullets = paragraphs.slice(0, Math.min(2, paragraphs.length)).map((para, index) => {
-    const sentence = extractFirstSentence(para.originalText || '');
-    return `<li>Key point ${index + 1}: ${sentence}</li>`;
-  }).join('');
+  const previewParagraphs = paragraphs.slice(0, Math.min(3, paragraphs.length));
+  const initialBullets = previewParagraphs
+    .map((para, index) => {
+      const sentence = extractFirstSentence(para.originalText || '');
+      const safeSentence = escapeHtml(sentence || 'Gathering the first key idea…');
+      return `
+        <li>
+          <span class="eduadapt-placeholder-label">Focus point ${index + 1}</span>
+          <span class="eduadapt-placeholder-text">${safeSentence}</span>
+        </li>
+      `;
+    })
+    .join('');
   summaryContainer.innerHTML = `
-    <div class="eduadapt-summary-heading">Quick overview</div>
-    <div class="eduadapt-summary-body">
-      <ul class="eduadapt-summary-placeholder">${initialBullets}</ul>
+    <div class="eduadapt-summary-heading">
+      <div class="eduadapt-summary-heading-label">
+        <span class="eduadapt-heading-pulse" aria-hidden="true"></span>
+        Quick focus scan
+      </div>
+      <span class="eduadapt-summary-tag">ADHD boost</span>
+    </div>
+    <div class="eduadapt-summary-meta" role="status">
+      <div class="eduadapt-meta-block">
+        <span class="eduadapt-meta-label">Focus topic</span>
+        <span class="eduadapt-meta-value">${focusTopic}</span>
+      </div>
+      <div class="eduadapt-meta-block">
+        <span class="eduadapt-meta-label">Sections queued</span>
+        <span class="eduadapt-meta-value">${queuedSections}</span>
+      </div>
+      <div class="eduadapt-meta-block">
+        <span class="eduadapt-meta-label">Approx read</span>
+        <span class="eduadapt-meta-value">${estimatedLabel}</span>
+      </div>
+    </div>
+    <div class="eduadapt-summary-body" aria-live="polite" aria-label="Quick focus overview content">
+      <ul class="eduadapt-summary-placeholder">
+        ${
+          initialBullets ||
+          `<li><span class="eduadapt-placeholder-label">Heads up</span><span class="eduadapt-placeholder-text">Scanning the first section so you can jump in faster…</span></li>`
+        }
+      </ul>
+    </div>
+    <div class="eduadapt-summary-status">
+      <div class="eduadapt-loading-track" role="progressbar" aria-busy="true" aria-label="Creating ADHD focus overview">
+        <span class="eduadapt-loading-bar"></span>
+      </div>
+      <span class="eduadapt-status-text">Hang tight—your focus overview unlocks in a few seconds.</span>
     </div>
   `;
   const body = summaryContainer.querySelector('.eduadapt-summary-body');
+  const statusText = summaryContainer.querySelector('.eduadapt-status-text');
+  const loadingTrack = summaryContainer.querySelector('.eduadapt-loading-track');
   
   const target = mainElement || findMainContent();
   if (target) {
@@ -297,14 +363,35 @@ function createADHDQuickSummary(paragraphs, mainElement, options) {
     options: options
   }).then(response => {
     if (response && response.success) {
-      body.innerHTML = formatAdaptedText(response.adaptedText, 'adhd', 'div');
+      summaryContainer.classList.add('eduadapt-summary-ready');
+      if (loadingTrack) {
+        loadingTrack.setAttribute('aria-busy', 'false');
+      }
+      body.innerHTML = `<div class="eduadapt-summary-result">${formatAdaptedText(response.adaptedText, 'adhd', 'div')}</div>`;
+      if (statusText) {
+        statusText.textContent = 'Focus overview ready — use these highlights as your checklist.';
+      }
       enhanceGlossaryContent(summaryContainer);
     } else {
+      summaryContainer.classList.add('eduadapt-summary-error');
+      if (loadingTrack) {
+        loadingTrack.setAttribute('aria-busy', 'false');
+      }
       body.textContent = response?.userMessage || 'Could not generate summary.';
+      if (statusText) {
+        statusText.textContent = 'We hit a snag generating the focus overview.';
+      }
     }
   }).catch(error => {
     console.error('Quick summary error:', error);
+    summaryContainer.classList.add('eduadapt-summary-error');
+    if (loadingTrack) {
+      loadingTrack.setAttribute('aria-busy', 'false');
+    }
     body.textContent = 'Error generating summary.';
+    if (statusText) {
+      statusText.textContent = 'Something went wrong while creating the overview.';
+    }
   });
 }
 
@@ -337,23 +424,6 @@ function prioritizeADHDParagraphs(paragraphs, maxItems = 10) {
   return ordered.slice(0, Math.min(maxItems, ordered.length));
 }
 
-function ensureAutismPlaceholder(para, index) {
-  if (!para || !para.element) {
-    return;
-  }
-  if (para.element.dataset.eduadaptAutismPlaceholder === 'true') {
-    return;
-  }
-  para.element.dataset.eduadaptAutismPlaceholder = 'true';
-  para.element.classList.add('eduadapt-autism-original');
-  para.element.innerHTML = `
-    <div class="eduadapt-autism-placeholder">
-      <div class="eduadapt-autism-placeholder-title">Literal rewrite ${index + 1}</div>
-      <div class="eduadapt-autism-placeholder-body">Converting this section to concrete language…</div>
-    </div>
-  `;
-}
-
 function ensureADHDPlaceholder(para, index) {
   if (!para || !para.element) {
     return;
@@ -374,12 +444,7 @@ function ensureADHDPlaceholder(para, index) {
 }
 
 function enhanceGlossaryContent(root) {
-  if (!root) {
-    return;
-  }
-  root.querySelectorAll('.eduadapt-glossary-term').forEach(term => {
-    term.setAttribute('tabindex', '0');
-  });
+  // No-op: glossary entries now render as plain text.
 }
 
 async function adaptParagraphContent(para, profile, options, index) {
@@ -408,13 +473,6 @@ async function adaptParagraphContent(para, profile, options, index) {
         </div>
       `;
       para.element.dataset.eduadaptAdhdPlaceholder = 'done';
-    } else if (profile === 'autism') {
-      para.element.innerHTML = `
-        <div class="eduadapt-autism-section">
-          ${formatted}
-        </div>
-      `;
-      para.element.dataset.eduadaptAutismPlaceholder = 'done';
     } else {
       para.element.innerHTML = formatted;
     }
@@ -428,13 +486,6 @@ async function adaptParagraphContent(para, profile, options, index) {
         </div>
       `;
       para.element.dataset.eduadaptAdhdPlaceholder = 'error';
-    } else if (profile === 'autism') {
-      para.element.innerHTML = `
-        <div class="eduadapt-autism-section eduadapt-autism-section-error">
-          <p>This section could not be rewritten right now.</p>
-        </div>
-      `;
-      para.element.dataset.eduadaptAutismPlaceholder = 'error';
     }
   }
 }
@@ -682,16 +733,14 @@ async function adaptPage(profile, options = {}) {
       return;
     }
 
-    let targetParagraphs;
-    if (profile === 'adhd') {
-      targetParagraphs = prioritizeADHDParagraphs(paragraphs, 8);
+    const isADHD = profile === 'adhd';
+    const targetParagraphs = isADHD
+      ? prioritizeADHDParagraphs(paragraphs, 8)
+      : paragraphs.slice(0, 10);
+
+    if (isADHD) {
       targetParagraphs.forEach((para, idx) => ensureADHDPlaceholder(para, idx));
       createADHDQuickSummary(targetParagraphs, mainContent, currentOptions);
-    } else if (profile === 'autism') {
-      targetParagraphs = paragraphs.slice(0, 8);
-      targetParagraphs.forEach((para, idx) => ensureAutismPlaceholder(para, idx));
-    } else {
-      targetParagraphs = paragraphs.slice(0, 10);
     }
 
     if (targetParagraphs.length === 0) {
@@ -736,37 +785,6 @@ async function adaptPage(profile, options = {}) {
         workers.push(runRemainingWorker());
       }
       await Promise.all(workers);
-    } else if (profile === 'autism') {
-      const firstBatchCount = Math.min(2, targetParagraphs.length);
-      for (let i = 0; i < firstBatchCount; i++) {
-        await adaptParagraphContent(targetParagraphs[i], profile, currentOptions, i);
-        adapted++;
-        updateLoadingIndicator(adapted, total);
-      }
-      
-      const remaining = targetParagraphs.slice(firstBatchCount);
-      const concurrency = Math.min(2, Math.max(1, remaining.length));
-      let nextIndex = 0;
-      
-      async function runAutismWorker() {
-        while (true) {
-          const currentIndex = nextIndex;
-          if (currentIndex >= remaining.length) {
-            break;
-          }
-          nextIndex++;
-          const para = remaining[currentIndex];
-          await adaptParagraphContent(para, profile, currentOptions, currentIndex + firstBatchCount);
-          adapted++;
-          updateLoadingIndicator(adapted, total);
-        }
-      }
-      
-      const autismWorkers = [];
-      for (let i = 0; i < concurrency; i++) {
-        autismWorkers.push(runAutismWorker());
-      }
-      await Promise.all(autismWorkers);
     } else {
       for (const para of targetParagraphs) {
         await adaptParagraphContent(para, profile, currentOptions);
@@ -820,7 +838,6 @@ function formatAdaptedText(text, profile, tagName) {
 
   const closeGlossary = () => {
     if (inGlossary) {
-      html += '</ul></div>';
       inGlossary = false;
     }
   };
@@ -862,7 +879,7 @@ function formatAdaptedText(text, profile, tagName) {
     if (/^glossary[:]?$/i.test(line)) {
       closeList();
       closeGlossary();
-      html += `<div class="eduadapt-glossary"><div class="eduadapt-glossary-title">Glossary</div><ul>`;
+      html += `<p><strong>Glossary</strong></p>`;
       inGlossary = true;
       return;
     }
@@ -872,13 +889,7 @@ function formatAdaptedText(text, profile, tagName) {
       if (glossaryMatch) {
         const term = cleanGlossaryText(glossaryMatch[1]);
         const definition = cleanGlossaryText(glossaryMatch[2]);
-        html += `
-          <li>
-            <button type="button" class="eduadapt-glossary-term" data-definition="${definition}" title="${definition}">
-              ${term}
-            </button>
-          </li>
-        `;
+        html += `<p>${term} - ${definition}</p>`;
         return;
       }
       closeGlossary();
@@ -1130,10 +1141,20 @@ function applyCSSForProfile(profile) {
       }
       .eduadapt-adapted .eduadapt-adhd-summary {
         margin: 1em 0 2em;
-        padding: 1em 1.2em;
-        background: #fff9c4;
-        border-left: 4px solid #fbc02d;
+        padding: 1.2em 1.4em;
+        background: linear-gradient(135deg, #fff9c4 0%, #fff3a0 100%);
+        border-left: 5px solid #f59e0b;
         border-radius: 8px;
+        box-shadow: 0 8px 18px rgba(247, 181, 0, 0.18);
+        position: relative;
+        overflow: hidden;
+      }
+      .eduadapt-adapted .eduadapt-adhd-summary::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(140deg, rgba(255, 255, 255, 0.35), rgba(255, 243, 160, 0));
+        pointer-events: none;
       }
       .eduadapt-adapted .eduadapt-adhd-section {
         margin: 0 0 1.5em;
@@ -1143,18 +1164,184 @@ function applyCSSForProfile(profile) {
         border-left: 4px solid #fbc02d;
       }
       .eduadapt-adapted .eduadapt-summary-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8em;
         font-weight: 700;
-        margin-bottom: 0.5em;
-        color: #3b3b3b;
+        margin-bottom: 0.75em;
+        color: #1f2933;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
       }
       .eduadapt-adapted .eduadapt-summary-body {
         font-size: 0.95em;
         color: #444;
       }
-      .eduadapt-adapted .eduadapt-summary-placeholder {
-        margin: 0;
-        padding-left: 1.1em;
+      .eduadapt-adapted .eduadapt-summary-heading-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6em;
+        font-size: 0.95rem;
+      }
+      .eduadapt-adapted .eduadapt-heading-pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #f97316;
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.6);
+        animation: eduadapt-pulse 1.6s ease-in-out infinite;
+      }
+      .eduadapt-adapted .eduadapt-summary-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25em 0.6em;
+        background: #1d4ed8;
+        color: #ffffff;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+      }
+      .eduadapt-adapted .eduadapt-summary-meta {
+        display: grid;
+        gap: 0.8em;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        margin-bottom: 0.9em;
+        padding: 0.65em;
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 6px;
+      }
+      .eduadapt-adapted .eduadapt-meta-block {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2em;
+      }
+      .eduadapt-adapted .eduadapt-meta-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .eduadapt-adapted .eduadapt-meta-value {
+        font-size: 0.95rem;
+        font-weight: 600;
         color: #1f2933;
+      }
+      .eduadapt-adapted .eduadapt-summary-placeholder {
+        margin: 0 0 0.5em 0;
+        padding-left: 0;
+        color: #1f2933;
+        list-style: none;
+      }
+      .eduadapt-adapted .eduadapt-summary-placeholder li {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15em;
+        padding: 0.65em 0.7em;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.78);
+        margin-bottom: 0.4em;
+      }
+      .eduadapt-adapted .eduadapt-placeholder-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #f97316;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .eduadapt-adapted .eduadapt-placeholder-text {
+        font-size: 0.95rem;
+        color: #1f2933;
+        line-height: 1.4;
+      }
+      .eduadapt-adapted .eduadapt-summary-status {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35em;
+        margin-top: 0.6em;
+        padding-top: 0.65em;
+        border-top: 1px dashed rgba(249, 115, 22, 0.45);
+      }
+      .eduadapt-adapted .eduadapt-loading-track {
+        position: relative;
+        width: 100%;
+        height: 6px;
+        background: rgba(249, 115, 22, 0.25);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .eduadapt-adapted .eduadapt-loading-bar {
+        position: absolute;
+        inset: 0;
+        width: 40%;
+        background: linear-gradient(90deg, rgba(249, 115, 22, 0.5), rgba(249, 115, 22, 0.95));
+        border-radius: 999px;
+        animation: eduadapt-loading 1.2s ease-in-out infinite;
+      }
+      .eduadapt-adapted .eduadapt-status-text {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #b45309;
+      }
+      .eduadapt-adapted .eduadapt-summary-ready .eduadapt-summary-status {
+        border-top-color: rgba(22, 101, 52, 0.45);
+      }
+      .eduadapt-adapted .eduadapt-summary-ready .eduadapt-status-text {
+        color: #166534;
+      }
+      .eduadapt-adapted .eduadapt-summary-ready .eduadapt-loading-bar {
+        background: linear-gradient(90deg, rgba(22, 101, 52, 0.4), rgba(21, 128, 61, 0.9));
+        animation: none;
+        width: 100%;
+      }
+      .eduadapt-adapted .eduadapt-summary-ready .eduadapt-loading-track {
+        background: rgba(21, 128, 61, 0.18);
+      }
+      .eduadapt-adapted .eduadapt-summary-result {
+        display: grid;
+        gap: 0.5em;
+      }
+      .eduadapt-adapted .eduadapt-summary-error {
+        border-left-color: #dc2626;
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        box-shadow: 0 10px 22px rgba(220, 38, 38, 0.15);
+      }
+      .eduadapt-adapted .eduadapt-summary-error .eduadapt-status-text {
+        color: #b91c1c;
+      }
+      .eduadapt-adapted .eduadapt-summary-error .eduadapt-loading-track {
+        background: rgba(220, 38, 38, 0.2);
+      }
+      .eduadapt-adapted .eduadapt-summary-error .eduadapt-loading-bar {
+        background: rgba(220, 38, 38, 0.45);
+        animation: none;
+        width: 100%;
+      }
+      @keyframes eduadapt-pulse {
+        0% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.6);
+        }
+        70% {
+          transform: scale(1.25);
+          box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+        }
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+        }
+      }
+      @keyframes eduadapt-loading {
+        0% {
+          transform: translateX(-60%);
+        }
+        50% {
+          transform: translateX(20%);
+        }
+        100% {
+          transform: translateX(120%);
+        }
       }
       .eduadapt-adapted .eduadapt-adhd-placeholder-title {
         font-weight: 600;
@@ -1193,55 +1380,6 @@ function applyCSSForProfile(profile) {
         margin-top: 0.2em;
       }
     `,
-    
-    autism: `
-      .eduadapt-adapted {
-        font-family: Arial, sans-serif !important;
-        line-height: 1.8 !important;
-      }
-      body.eduadapt-active {
-        background: #f0f4f8 !important;
-        color: #2d3748 !important;
-      }
-      .eduadapt-adapted *, 
-      .eduadapt-adapted *::before, 
-      .eduadapt-adapted *::after {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
-      }
-      .eduadapt-adapted ol, 
-      .eduadapt-adapted ul {
-        margin: 1em 0;
-        padding-left: 2em;
-      }
-      .eduadapt-adapted .eduadapt-autism-placeholder {
-        margin: 0 0 1.2em;
-        padding: 0.9em 1em;
-        background: #edf2ff;
-        border-left: 4px solid #4c51bf;
-        border-radius: 8px;
-        color: #253055;
-      }
-      .eduadapt-adapted .eduadapt-autism-placeholder-title {
-        font-weight: 600;
-        margin-bottom: 0.3em;
-      }
-      .eduadapt-adapted .eduadapt-autism-placeholder-body {
-        font-size: 0.9em;
-      }
-      .eduadapt-adapted .eduadapt-autism-section {
-        margin: 0 0 1.4em;
-        padding: 0.95em 1.05em;
-        background: #f8fafc;
-        border-left: 4px solid #4c51bf;
-        border-radius: 8px;
-      }
-      .eduadapt-adapted .eduadapt-autism-section-error {
-        background: #fef2f2;
-        border-left-color: #dc2626;
-        color: #991b1b;
-      }
-    `
   };
   const gradeAndGlossaryCSS = `
       body.eduadapt-grade-lower .eduadapt-adapted {
@@ -1250,70 +1388,6 @@ function applyCSSForProfile(profile) {
       }
       body.eduadapt-grade-lower .eduadapt-question {
         display: none !important;
-      }
-      body.eduadapt-grade-lower .eduadapt-glossary,
-      body.eduadapt-grade-lower .eduadapt-glossary * {
-        text-transform: none !important;
-      }
-      .eduadapt-adapted .eduadapt-glossary {
-        margin: 1.5em 0;
-        padding: 1em;
-        background: #eef2ff;
-        border-radius: 8px;
-        border-left: 4px solid #6366f1;
-      }
-      .eduadapt-adapted .eduadapt-glossary-title {
-        font-weight: 700;
-        color: #3730a3;
-        margin-bottom: 0.6em;
-      }
-      .eduadapt-adapted .eduadapt-glossary ul {
-        list-style: none;
-        padding-left: 0;
-        margin: 0;
-        display: grid;
-        gap: 0.6em;
-      }
-      .eduadapt-adapted .eduadapt-glossary-term {
-        background: #f4f6ff;
-        border: 1px solid #cbd5f5;
-        border-radius: 6px;
-        padding: 0.5em 0.7em;
-        cursor: pointer;
-        position: relative;
-        font-weight: 600;
-        color: #1f2933;
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
-      }
-      .eduadapt-adapted .eduadapt-glossary-term:hover,
-      .eduadapt-adapted .eduadapt-glossary-term:focus {
-        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
-        transform: translateY(-1px);
-        outline: none;
-      }
-      .eduadapt-adapted .eduadapt-glossary-term::after {
-        content: attr(data-definition);
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: calc(100% + 10px);
-        background: #111827;
-        color: #ffffff;
-        padding: 0.6em 0.8em;
-        border-radius: 6px;
-        white-space: normal;
-        width: max-content;
-        max-width: 220px;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.15s ease;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.3);
-        z-index: 999999;
-        font-size: 0.85em;
-      }
-      .eduadapt-adapted .eduadapt-glossary-term:hover::after,
-      .eduadapt-adapted .eduadapt-glossary-term:focus::after {
-        opacity: 1;
       }
       .eduadapt-adapted .eduadapt-question-advanced {
         color: #1f3a8a !important;
