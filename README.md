@@ -116,7 +116,7 @@ Students with learning differences often struggle with dense web content that is
 - Research disclaimers and acknowledgements
 
 ### Demo Video
-[Link will be added here after video creation]
+https://youtu.be/oMkCbqEe06g?si=1zaO_jPJMboXuqLP
 
 ### Questions or Issues?
 Contact: davide.iotti123@gmail.com
