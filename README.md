@@ -5,11 +5,11 @@
 [![Chrome Built-in AI Challenge 2025](https://img.shields.io/badge/Chrome%20AI-Challenge%202025-blue)](https://googlechromeai2025.devpost.com/)  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 
-> ⚠️ **Important:** EduAdapt is a prototype. The learning strategies have been compiled through AI-assisted research and iterative feedback from a doctoral researcher in special education. They illustrate an approach and are **not** a substitute for professional recommendations, classroom accommodations, or clinical interventions. Any real-world deployment must be co-designed with teachers, caregivers, and neurodivergent learners.
+> **Important:** EduAdapt is a prototype. The learning strategies have been compiled through AI-assisted research and iterative feedback from a doctoral researcher in special education. They illustrate an approach and are **not** a substitute for professional recommendations, classroom accommodations, or clinical interventions. Any real-world deployment must be co-designed with teachers, caregivers, and neurodivergent learners.
 
 ---
 
-## 🏆 For Hackathon Judges
+## For Hackathon Judges
 
 **Project Category:** Chrome Extension  
 **Challenge:** Google Chrome Built-in AI Challenge 2025
@@ -18,8 +18,8 @@
 EduAdapt is an AI-powered learning accessibility tool that transforms web content in real-time for students with ADHD, Dyslexia, and other learning differences. Unlike traditional accessibility tools that only adjust visual styling, EduAdapt uses Chrome's **on-device Gemini Nano** to intelligently restructure content based on research-backed teaching strategies.
 
 ### Chrome AI APIs Used
-✅ **Prompt API** - Core text transformation engine for profile-aware content rewrites  
-✅ **Summarizer API** - Generates structured quick overviews for ADHD support mode
+ **Prompt API** - Core text transformation engine for profile-aware content rewrites  
+**Summarizer API** - Generates structured quick overviews for ADHD support mode
 
 ### Problem Solved
 Students with learning differences often struggle with dense web content that isn't adapted to their cognitive needs. EduAdapt addresses this by:
