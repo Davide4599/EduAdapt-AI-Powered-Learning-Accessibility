@@ -83,19 +83,14 @@ If it returns something else:
    ```
    
    Or download ZIP and extract it.
-
-2. **Create Icons** (temporary step):
-   - Open `assets/icons/icon-generator.html` in Chrome
-   - Download the 3 generated PNG files
-   - Save them in `assets/icons/` folder
-
-3. **Load in Chrome:**
+2. **Load in Chrome:**
    - Open Chrome
    - Go to: `chrome://extensions/`
    - Enable: **"Developer mode"** (toggle in top-right)
    - Click: **"Load unpacked"**
    - Select the `eduadapt` folder
    - Extension should appear! 🎉
+   - Icons (`assets/icons/icon16.png`, `icon48.png`, `icon128.png`) are already bundled—no extra steps needed.
 
 ### Option B: From Chrome Web Store
 
