@@ -538,28 +538,6 @@ RULES:
 TEXT TO ADAPT:
 ${text}
 
-ADAPTED TEXT:`,
-
-    autism: `You are helping a student on the autism spectrum (low functioning). Adapt the following text for clear understanding.
-
-PRINCIPLES:
-- Use literal, concrete language only. Remove or rewrite metaphors, idioms, sarcasm, exaggeration, and rhetorical devices.
-- Keep sentences short (10-14 words) and direct. State the subject first.
-- Use the same term every time for the same idea. Avoid pronouns like "it" or "they" unless the referent is explicit.
-- Explain actions step-by-step when instructions are present.
-
-OUTPUT SECTIONS (in this order):
-1. Literal Rewrite:
-   - Present the adapted content in plain paragraphs.
-   - Highlight key facts with **bold** when essential for meaning.
-   - Do not add new information.
-2. Page Overview:
-   - Provide a bullet list (•) describing what appears on the web page (headings, sections, media, links).
-   - Each bullet should mention where the information appears and what it contains.
-
-TEXT TO ADAPT:
-${text}
-
 ADAPTED TEXT:`
   };
   

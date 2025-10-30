@@ -13,7 +13,6 @@ Congratulazioni! L'estensione Chrome EduAdapt è stata creata con successo! 🚀
 - 🤖 Integrazione con Chrome Built-in AI (Gemini Nano)
 - 👁️ Supporto Dislessia
 - 🎯 Supporto ADHD
-- 🧩 Supporto Autism Spectrum
 - 🎨 UI professionale con design gradient
 - 📄 Documentazione completa
 
@@ -75,7 +74,7 @@ cd eduadapt/assets/icons
 - ⏱️ Durata: < 3 minuti
 - 🎥 Contenuto:
   - Problema che risolvi
-  - Demo dell'estensione (tutti e 3 i profili)
+  - Demo dell'estensione (entrambi i profili)
   - Mostra Gemini Nano in azione
   - Impatto sociale
 
@@ -112,7 +111,7 @@ cd eduadapt/assets/icons
 
 ### 💪 Implementazione Solida
 - Codice pulito e ben documentato
-- 3 profili completi
+- 2 profili completi
 - UI professionale
 - Pronto per production
 
@@ -131,7 +130,7 @@ cd eduadapt/assets/icons
 - **File HTML**: 2
 - **File CSS**: 2
 - **Documentazione**: 5 file
-- **Profili supportati**: 3 (Dyslexia, ADHD, Autism)
+- **Profili supportati**: 2 (Dyslexia, ADHD)
 
 ---
 
@@ -140,7 +139,7 @@ cd eduadapt/assets/icons
 Prima di submittere, testa:
 
 - [ ] AI availability check funziona
-- [ ] Tutti e 3 i profili adattano il testo
+- [ ] Entrambi i profili adattano il testo
 - [ ] Reset ripristina pagina originale
 - [ ] Auto-adapt funziona
 - [ ] Loading indicator appare
@@ -156,7 +155,7 @@ Prima di submittere, testa:
 "Ciao! Sono [nome] e questo è EduAdapt, un'estensione Chrome che rende il web accessibile per studenti con difficoltà di apprendimento."
 
 **Problema (30 sec)**
-"15% degli studenti hanno dislessia, ADHD, o autismo. Il web è pieno di testi complessi difficili da leggere. Le soluzioni esistenti cambiano solo font e colori, ma non il contenuto stesso."
+"15% degli studenti hanno dislessia o ADHD. Il web è pieno di testi complessi difficili da leggere. Le soluzioni esistenti cambiano solo font e colori, ma non il contenuto stesso."
 
 **Soluzione (45 sec)**
 [Mostra demo]
