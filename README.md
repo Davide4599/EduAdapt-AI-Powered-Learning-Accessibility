@@ -272,6 +272,11 @@ popup (UI) ─┬─> content script (page extraction + rendering)
 - **Performance optimization:** Current processing time varies by article length and device performance. Already implemented: prefetch queue that begins paragraph processing before user interaction (dyslexia mode). Next: parallel processing across multiple paragraphs, response streaming, and prompt compression techniques.
 - **Rewriter API integration for dyslexia support:** Awaiting origin trial token to leverage browser-native text simplification capabilities for improved speed and reliability.
 
+### Loading Time Improvements Tried
+- Cached Gemini sessions and Summarizer instances to avoid repeated start-up costs.
+- Trimmed ADHD quick-scan input to core heading + highlights, cutting token load.
+- Prioritised short dyslexia paragraphs with a preview micro-pass while full rewrites finish.
+
 ### Planned Development
 - **Personalized user profiles:** Enable educators to create, manage, and refine individualized accommodation settings for each student. Profiles will support granular feature control (typography, simplification thresholds, sensory adjustments, interaction modes), persist across sessions, and evolve as learners progress or preferences shift. This feature addresses the heterogeneity of neurodevelopmental profiles and aligns with IEP-driven support models.
 - **Qualitative user research:** Conduct structured feedback sessions with educators, special education specialists, and students to validate design decisions, identify gaps, and iteratively improve accessibility features.

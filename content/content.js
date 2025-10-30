@@ -7,6 +7,8 @@ let currentProfile = null;
 const MIN_TEXT_LENGTH = 60;
 const MIN_WORD_COUNT = 10;
 const MIN_ELEMENT_WIDTH = 360;
+const DYSLEXIA_PREVIEW_MIN_TOTAL = 120;
+const DYSLEXIA_PREVIEW_MAX_CHARS = 260;
 const DEFAULT_OPTIONS = {
   dyslexiaLevel: 'medium',
   adhdSummaryLength: 'short',
@@ -20,7 +22,9 @@ const dyslexiaPrefetchState = {
   active: 0,
   maxConcurrent: 2,
   maxPrefetchItems: 8,
-  version: 0
+  version: 0,
+  activeShort: 0,
+  maxShortConcurrent: 1
 };
 
 function escapeHtml(str = '') {
@@ -73,9 +77,39 @@ function splitTextIntoChunks(text = '', maxSize = DYSLEXIA_MANUAL_CHUNK_SIZE) {
   return chunks.filter(Boolean);
 }
 
+function buildDyslexiaPreviewSnippet(text = '', maxChars = DYSLEXIA_PREVIEW_MAX_CHARS) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.length <= maxChars) {
+    return trimmed;
+  }
+  const sentences = trimmed.split(/(?<=[.!?])\s+/);
+  let snippet = '';
+  for (const sentence of sentences) {
+    if (!sentence) {
+      continue;
+    }
+    const candidate = snippet ? `${snippet} ${sentence}` : sentence;
+    if (candidate.length > maxChars) {
+      if (!snippet) {
+        return sentence.slice(0, maxChars).replace(/\s+\S*$/, '').trim();
+      }
+      break;
+    }
+    snippet = candidate;
+    if (snippet.length >= maxChars * 0.8) {
+      break;
+    }
+  }
+  return snippet.trim();
+}
+
 function resetDyslexiaPrefetch() {
   dyslexiaPrefetchState.queue = [];
   dyslexiaPrefetchState.active = 0;
+  dyslexiaPrefetchState.activeShort = 0;
   dyslexiaPrefetchState.version += 1;
 }
 
@@ -90,20 +124,90 @@ function enqueueDyslexiaJob(job) {
   job.state = 'queued';
   job.version = dyslexiaPrefetchState.version;
   job.status.textContent = 'Preparing supported reading...';
-  dyslexiaPrefetchState.queue.push(job);
+  job.isShort = job.text.length <= 400;
+  if (job.isShort) {
+    dyslexiaPrefetchState.queue.unshift(job);
+  } else {
+    dyslexiaPrefetchState.queue.push(job);
+  }
   processDyslexiaQueue();
 }
 
 function processDyslexiaQueue() {
-  while (
-    dyslexiaPrefetchState.active < dyslexiaPrefetchState.maxConcurrent &&
-    dyslexiaPrefetchState.queue.length > 0
-  ) {
-    const job = dyslexiaPrefetchState.queue.shift();
-    if (!job || job.version !== dyslexiaPrefetchState.version) {
+  while (dyslexiaPrefetchState.queue.length > 0) {
+    const job = dyslexiaPrefetchState.queue[0];
+    if (!job) {
+      dyslexiaPrefetchState.queue.shift();
       continue;
     }
+    if (job.version !== dyslexiaPrefetchState.version) {
+      dyslexiaPrefetchState.queue.shift();
+      continue;
+    }
+    const canUseStandardSlot = dyslexiaPrefetchState.active < dyslexiaPrefetchState.maxConcurrent;
+    const canUseShortSlot =
+      job.isShort && dyslexiaPrefetchState.activeShort < dyslexiaPrefetchState.maxShortConcurrent;
+    if (!canUseStandardSlot && !canUseShortSlot) {
+      break;
+    }
+    dyslexiaPrefetchState.queue.shift();
     startDyslexiaJob(job);
+  }
+}
+
+async function maybeRenderDyslexiaPreview(job, fromUser, onRendered) {
+  if (!job || job.profile !== 'dyslexia') {
+    return;
+  }
+  if (job.previewInFlight || job.state !== 'running') {
+    return;
+  }
+  if ((job.text || '').length < DYSLEXIA_PREVIEW_MIN_TOTAL) {
+    return;
+  }
+  const snippet = buildDyslexiaPreviewSnippet(job.text);
+  if (!snippet || snippet.length < 40) {
+    return;
+  }
+  job.previewInFlight = true;
+  job.support.dataset.previewing = 'true';
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'adaptText',
+      text: snippet,
+      profile: job.profile,
+      options: job.options
+    });
+    if (!response || !response.success || job.version !== dyslexiaPrefetchState.version || job.state !== 'running') {
+      return;
+    }
+    const formatted = formatAdaptedText(
+      response.adaptedText.trim(),
+      job.profile,
+      job.tagName
+    );
+    job.support.innerHTML = formatted;
+    enhanceGlossaryContent(job.support);
+    job.support.dataset.partial = 'true';
+    job.support.dataset.preview = 'true';
+    job.support.dataset.previewing = 'false';
+    if (fromUser) {
+      job.support.classList.add('eduadapt-visible');
+      job.button.textContent = 'Hide supported reading';
+      job.status.textContent = 'Preview ready… finishing details...';
+    } else {
+      job.status.textContent = 'Preview ready… completing details...';
+    }
+    if (typeof onRendered === 'function') {
+      onRendered();
+    }
+  } catch (error) {
+    console.warn('Preview adaptation failed:', error);
+  } finally {
+    job.previewInFlight = false;
+    if (job.support) {
+      job.support.dataset.previewing = 'false';
+    }
   }
 }
 
@@ -156,6 +260,7 @@ async function startDyslexiaJob(job, options = {}) {
   job.state = 'running';
   job.pendingUserReveal = fromUser;
   job.support.dataset.prefetching = 'true';
+  job.isShort = job.isShort ?? job.text.length <= 400;
   if (fromUser) {
     job.button.disabled = true;
     job.button.textContent = 'Generating...';
@@ -165,14 +270,26 @@ async function startDyslexiaJob(job, options = {}) {
   }
   
   dyslexiaPrefetchState.active += 1;
+  if (job.isShort) {
+    dyslexiaPrefetchState.activeShort += 1;
+  }
   
   try {
     const chunks = splitTextIntoChunks(job.text);
     let combinedText = '';
+    let hasRenderedFirstChunk = false;
+    let hasRenderedPreview = false;
+
+    maybeRenderDyslexiaPreview(job, fromUser, () => {
+      hasRenderedPreview = true;
+    }).catch(error => console.warn('Preview error:', error));
 
     for (let i = 0; i < chunks.length; i++) {
-      if (fromUser && chunks.length > 1) {
-        job.status.textContent = `Creating supported reading (${i + 1}/${chunks.length})...`;
+      if (chunks.length > 1) {
+        const progressMessage = hasRenderedPreview
+          ? `Finishing supported reading (${i + 1}/${chunks.length})...`
+          : `Creating supported reading (${i + 1}/${chunks.length})...`;
+        job.status.textContent = progressMessage;
       }
 
       const response = await chrome.runtime.sendMessage({
@@ -191,12 +308,45 @@ async function startDyslexiaJob(job, options = {}) {
       }
 
       combinedText += `${response.adaptedText.trim()}\n\n`;
+      const trimmedCombined = combinedText.trim();
+      job.support.innerHTML = formatAdaptedText(trimmedCombined, job.profile, job.tagName);
+      enhanceGlossaryContent(job.support);
+
+      if (!hasRenderedFirstChunk) {
+        hasRenderedFirstChunk = true;
+        job.support.dataset.partial = 'true';
+        if (hasRenderedPreview) {
+          job.support.dataset.preview = 'true';
+        }
+        if (fromUser) {
+          job.support.classList.add('eduadapt-visible');
+          job.button.textContent = 'Hide supported reading';
+        }
+        if (chunks.length > 1) {
+          const progressMessage = hasRenderedPreview
+            ? `Finishing supported reading (${i + 1}/${chunks.length})...`
+            : `Creating supported reading (${i + 1}/${chunks.length})...`;
+          job.status.textContent = progressMessage;
+        } else if (!fromUser && hasRenderedPreview) {
+          job.status.textContent = 'Preview ready… completing details...';
+        } else if (!fromUser) {
+          job.status.textContent = 'Preparing supported reading...';
+        } else if (fromUser && chunks.length === 1) {
+          job.status.textContent = '';
+        }
+      } else if (chunks.length > 1) {
+        const progressMessage = hasRenderedPreview
+          ? `Finishing supported reading (${i + 1}/${chunks.length})...`
+          : `Creating supported reading (${i + 1}/${chunks.length})...`;
+        job.status.textContent = progressMessage;
+      }
     }
 
-    job.support.innerHTML = formatAdaptedText(combinedText.trim(), job.profile, job.tagName);
-    enhanceGlossaryContent(job.support);
     job.support.dataset.loaded = 'true';
     job.support.dataset.prefetching = 'false';
+    job.support.dataset.partial = 'false';
+    job.support.dataset.preview = 'false';
+    job.support.dataset.previewing = 'false';
     
     if (job.pendingUserReveal) {
       job.support.classList.add('eduadapt-visible');
@@ -218,6 +368,9 @@ async function startDyslexiaJob(job, options = {}) {
     console.error('Support section error:', error);
     job.state = 'failed';
     job.support.dataset.prefetching = 'false';
+    job.support.dataset.partial = 'false';
+    job.support.dataset.preview = 'false';
+    job.support.dataset.previewing = 'false';
     job.button.disabled = false;
     job.button.textContent = 'Try again';
     job.status.textContent = error.message || 'Could not create supported reading.';
@@ -225,30 +378,67 @@ async function startDyslexiaJob(job, options = {}) {
   } finally {
     if (job.version === dyslexiaPrefetchState.version) {
       dyslexiaPrefetchState.active = Math.max(0, dyslexiaPrefetchState.active - 1);
+      if (job.isShort) {
+        dyslexiaPrefetchState.activeShort = Math.max(0, dyslexiaPrefetchState.activeShort - 1);
+      }
       processDyslexiaQueue();
     }
   }
 }
 
-function buildADHDSummarySource(paragraphs, limitChars = 1200, maxParagraphs = 2) {
-  const chunks = [];
+function buildADHDSummarySource(paragraphs, limitChars = 900, maxHighlights = 5) {
+  if (!Array.isArray(paragraphs) || paragraphs.length === 0) {
+    return '';
+  }
+
+  const pieces = [];
+  const mainHeading =
+    (document.querySelector('main h1, article h1, header h1, h1') || document.querySelector('title'))?.textContent?.trim();
+  if (mainHeading) {
+    pieces.push(`Title: ${mainHeading.slice(0, 140)}`);
+  }
+
+  const introText = paragraphs[0]?.originalText?.trim() || '';
+  if (introText) {
+    const normalizedIntro = introText.replace(/\s+/g, ' ');
+    const introSnippet = normalizedIntro.length > 360 ? `${normalizedIntro.slice(0, 360).replace(/\s+\S*$/, '')}…` : normalizedIntro;
+    pieces.push(`Intro: ${introSnippet}`);
+  }
+
+  const highlightParas = paragraphs.slice(0, maxHighlights);
+  highlightParas.forEach((para, idx) => {
+    const source = (para && para.originalText) || '';
+    if (!source.trim()) {
+      return;
+    }
+    const sentence = extractFirstSentence(source);
+    if (!sentence) {
+      return;
+    }
+    pieces.push(`Highlight ${idx + 1}: ${sentence}`);
+  });
+
+  const selected = [];
   let total = 0;
-  for (const para of paragraphs) {
-    if (!para || !para.originalText) {
+  for (const piece of pieces) {
+    const trimmed = piece.trim();
+    if (!trimmed) {
       continue;
     }
-    const text = para.originalText.trim();
-    if (!text) {
+    const addition = total === 0 || total + trimmed.length <= limitChars
+      ? trimmed
+      : `${trimmed.slice(0, Math.max(0, limitChars - total - 1)).replace(/\s+\S*$/, '')}…`;
+    if (!addition) {
       continue;
     }
-    const newTotal = total + text.length;
-    chunks.push(text);
-    total = newTotal;
-    if (chunks.length >= maxParagraphs || total >= limitChars) {
+    selected.push(addition);
+    total += addition.length + 1;
+    if (total >= limitChars) {
       break;
     }
   }
-  return chunks.join('\n\n');
+
+  return selected.join('\n');
 }
 
 function extractFirstSentence(text = '') {
@@ -534,7 +724,7 @@ function extractParagraphs(element) {
   const firstHeading = document.querySelector('#firstHeading') || document.querySelector('main h1, h1');
 
   // Find all text-containing elements
-  const textElements = element.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div');
+  const textElements = element.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div, section');
   const excludedAncestors = [
     'nav',
     'header',
@@ -543,20 +733,39 @@ function extractParagraphs(element) {
     '[role="navigation"]',
     '[role="banner"]',
     '[role="contentinfo"]',
+    '[role="complementary"]',
     '[aria-hidden="true"]',
+    '[data-testid="sidebar"]',
+    '[data-testid="recommendation"]',
+    '[data-widget*="related"]',
     '.sidebar',
     '.widget',
     '.advert',
     '.advertisement',
     '.ads',
+    '.ad-unit',
     '.adunit',
+    '.ad-container',
+    '.ad-slot',
     '.sponsored',
     '.promo',
+    '.promoted',
     '.newsletter',
     '.subscription',
     '.cookie',
     '.modal',
     '.popup',
+    '.newsletter-signup',
+    '.related-articles',
+    '.recommended',
+    '.trending',
+    '.paywall',
+    '.gpt-slot',
+    '.taboola',
+    '.outbrain',
+    '.story-module',
+    '.share-tools',
+    '.social',
     '.eduadapt-support-tools',
     '.infobox',
     '.thumb',
@@ -584,7 +793,14 @@ function extractParagraphs(element) {
     'infobox',
     'thumb',
     'gallery',
-    'caption'
+    'caption',
+    'advert',
+    'sponsor',
+    'cookie',
+    'tracking',
+    'subscribe',
+    'newsletter',
+    'promo'
   ];
   const excludedTextPatterns = [
     /from wikipedia/i,
@@ -615,7 +831,12 @@ function extractParagraphs(element) {
     /newsletter/i,
     /advertising/i,
     /banner/i,
-    /social/i
+    /social/i,
+    /sponsor/i,
+    /subscribe/i,
+    /sign up/i,
+    /privacy/i,
+    /terms/i
   ];
 
   const hasKeywordAncestor = (node) => {

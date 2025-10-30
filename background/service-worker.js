@@ -14,6 +14,12 @@ const CONFIG = {
   SESSION_MAX_AGE: 30 * 60 * 1000, // 30 minutes total
 };
 
+const SUMMARIZER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const summarizerCache = new Map();
+
+const ADAPTATION_CACHE_LIMIT = 40;
+const adaptationCache = new Map();
+
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'checkAI') {
@@ -121,6 +127,120 @@ function isSessionError(error) {
  */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ==============================================================
+// SUMMARIZER SESSION CACHING
+// ==============================================================
+
+async function getSummarizerInstance(lengthSetting) {
+  const now = Date.now();
+  const cacheEntry = summarizerCache.get(lengthSetting);
+  if (cacheEntry && now - cacheEntry.lastUsed <= SUMMARIZER_CACHE_TTL) {
+    cacheEntry.lastUsed = now;
+    return cacheEntry.instance;
+  }
+
+  if (cacheEntry) {
+    try {
+      cacheEntry.instance?.destroy?.();
+    } catch (error) {
+      console.warn('Error destroying cached summarizer:', error);
+    }
+    summarizerCache.delete(lengthSetting);
+  }
+
+  const instance = await self.ai.summarizer.create({
+    type: 'key-points',
+    length: lengthSetting
+  });
+  summarizerCache.set(lengthSetting, { instance, lastUsed: now });
+  return instance;
+}
+
+function invalidateSummarizerInstance(lengthSetting) {
+  if (!summarizerCache.has(lengthSetting)) {
+    return;
+  }
+  const entry = summarizerCache.get(lengthSetting);
+  summarizerCache.delete(lengthSetting);
+  try {
+    entry.instance?.destroy?.();
+  } catch (error) {
+    console.warn('Error destroying summarizer instance:', error);
+  }
+}
+
+function clearSummarizerCache() {
+  summarizerCache.forEach(entry => {
+    try {
+      entry.instance?.destroy?.();
+    } catch (error) {
+      console.warn('Error destroying summarizer during cleanup:', error);
+    }
+  });
+  summarizerCache.clear();
+}
+
+// ==============================================================
+// ADAPTATION CACHE
+// ==============================================================
+
+function hashTextForCache(text = '') {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function buildAdaptationCacheKey(text, profile, options = {}, mode = 'default') {
+  const normalizedProfile = profile || 'default';
+  const gradeLevel = options.gradeLevel || 'upper';
+  if (normalizedProfile === 'dyslexia') {
+    const dyslexiaLevel = options.dyslexiaLevel || 'medium';
+    return `${normalizedProfile}|${gradeLevel}|${dyslexiaLevel}|${hashTextForCache(text)}`;
+  }
+  if (normalizedProfile === 'adhd') {
+    const adhdSummaryLength = options.adhdSummaryLength || 'short';
+    return `${normalizedProfile}|${gradeLevel}|${adhdSummaryLength}|${mode}|${hashTextForCache(text)}`;
+  }
+  return `${normalizedProfile}|${gradeLevel}|${mode}|${hashTextForCache(text)}`;
+}
+
+function getCachedAdaptation(key) {
+  const entry = adaptationCache.get(key);
+  if (!entry) {
+    return null;
+  }
+  entry.lastUsed = Date.now();
+  return { ...entry.payload };
+}
+
+function storeAdaptationInCache(key, payload) {
+  adaptationCache.set(key, {
+    payload: { ...payload },
+    lastUsed: Date.now()
+  });
+
+  if (adaptationCache.size > ADAPTATION_CACHE_LIMIT) {
+    let oldestKey = null;
+    let oldestTime = Infinity;
+    adaptationCache.forEach((value, cacheKey) => {
+      if (value.lastUsed < oldestTime) {
+        oldestTime = value.lastUsed;
+        oldestKey = cacheKey;
+      }
+    });
+    if (oldestKey) {
+      adaptationCache.delete(oldestKey);
+    }
+  }
+}
+
+function clearAdaptationCache() {
+  adaptationCache.clear();
 }
 
 // ==============================================================
@@ -285,44 +405,36 @@ async function adaptWithSummarizer(text, summaryLength = 'short') {
 
   try {
     const summaryText = await retryWithBackoff(async () => {
-      const summarizer = await self.ai.summarizer.create({
-        type: 'key-points',
-        length: lengthSetting
-      });
-      try {
-        const response = await summarizer.summarize(text);
-        let output = '';
-        if (typeof response === 'string') {
-          output = response;
-        } else if (response) {
-          if (typeof response.summary === 'string') {
-            output = response.summary;
-          } else if (Array.isArray(response.highlights)) {
-            output = response.highlights.join('\n');
-          } else if (Array.isArray(response.summaries)) {
-            output = response.summaries.join('\n');
-          }
-        }
-        if (!output || output.trim().length === 0) {
-          throw new Error('Summarizer returned empty output');
-        }
-        return output;
-      } finally {
-        if (typeof summarizer.destroy === 'function') {
-          summarizer.destroy();
+      const summarizer = await getSummarizerInstance(lengthSetting);
+      const response = await summarizer.summarize(text);
+      let output = '';
+      if (typeof response === 'string') {
+        output = response;
+      } else if (response) {
+        if (typeof response.summary === 'string') {
+          output = response.summary;
+        } else if (Array.isArray(response.highlights)) {
+          output = response.highlights.join('\n');
+        } else if (Array.isArray(response.summaries)) {
+          output = response.summaries.join('\n');
         }
       }
+      if (!output || output.trim().length === 0) {
+        throw new Error('Summarizer returned empty output');
+      }
+      return output;
     }, Math.min(CONFIG.MAX_RETRIES, 2), 'Summarizer Adaptation');
     return { success: true, adaptedText: summaryText };
   } catch (error) {
+    invalidateSummarizerInstance(lengthSetting);
     console.error('Summarizer adaptation failed:', error);
     return { success: false, reason: error.message };
   }
 }
 async function adaptText(text, profile, options = {}) {
   try {
-    // Validate input
-    if (!text || text.trim().length < 20) {
+    const trimmedText = (text || '').trim();
+    if (trimmedText.length < 20) {
       return { 
         success: false, 
         reason: 'Text too short (minimum 20 characters)' 
@@ -330,87 +442,97 @@ async function adaptText(text, profile, options = {}) {
     }
 
     const maxLength = 3000;
-    if (text.length > maxLength) {
-      text = truncateAtSentence(text, maxLength);
+    let workingText = trimmedText;
+    if (workingText.length > maxLength) {
+      workingText = truncateAtSentence(workingText, maxLength);
     }
 
+    const cacheKeyPrompt = buildAdaptationCacheKey(workingText, profile, options, 'prompt');
+
     if (profile === 'adhd') {
+      const cacheKeySummarizer = buildAdaptationCacheKey(workingText, profile, options, 'summarizer');
+      const cachedSummary = getCachedAdaptation(cacheKeySummarizer);
+      if (cachedSummary) {
+        return cachedSummary;
+      }
+
       const summarizerAttempt = await adaptWithSummarizer(
-        text,
+        workingText,
         options.adhdSummaryLength || 'short'
       );
       if (summarizerAttempt.success) {
         console.log('ADHD adaptation using Summarizer API');
         const adapted = summarizerAttempt.adaptedText;
-        return {
+        const summaryResult = {
           success: true,
           adaptedText: adapted,
           profile,
-          originalLength: text.length,
+          originalLength: workingText.length,
           adaptedLength: adapted.length,
           method: 'summarizer'
         };
+        storeAdaptationInCache(cacheKeySummarizer, summaryResult);
+        return summaryResult;
       } else {
         console.warn('Summarizer unavailable or failed, falling back to prompt:', summarizerAttempt.reason);
       }
+
+      const cachedFallback = getCachedAdaptation(cacheKeyPrompt);
+      if (cachedFallback) {
+        return cachedFallback;
+      }
+    } else {
+      const cachedResult = getCachedAdaptation(cacheKeyPrompt);
+      if (cachedResult) {
+        return cachedResult;
+      }
     }
-    
-    // Smart text truncation (preserve sentence boundaries)
-    if (text.length > maxLength) {
-      text = truncateAtSentence(text, maxLength);
-    }
-    
+
     // Adapt text with retry mechanism
     const result = await retryWithBackoff(async () => {
       const session = await createSession();
       
-      const prompt = getPromptForProfile(profile, text, options);
+      const prompt = getPromptForProfile(profile, workingText, options);
       
-      console.log(`Adapting text for ${profile} (${text.length} chars)...`);
+      const completion = await session.prompt(prompt);
       
-      const adaptedText = await session.prompt(prompt);
-      
-      // Validate the result
-      if (!adaptedText || adaptedText.trim().length === 0) {
+      if (!completion || typeof completion !== 'string' || completion.trim().length === 0) {
         throw new Error('AI returned empty response');
       }
       
-      return adaptedText;
+      return completion.trim();
       
-    }, CONFIG.MAX_RETRIES, `Adapt Text (${profile})`);
+    }, CONFIG.MAX_RETRIES, 'Text Adaptation');
     
-    console.log('Adaptation complete');
-    
-    return {
+    const successPayload = {
       success: true,
       adaptedText: result,
-      profile: profile,
-      originalLength: text.length,
-      adaptedLength: result.length
+      profile,
+      originalLength: workingText.length,
+      adaptedLength: result.length,
+      method: 'prompt'
     };
+    storeAdaptationInCache(cacheKeyPrompt, successPayload);
+    return successPayload;
     
   } catch (error) {
-    console.error('Error adapting text:', error);
-    
-    // Provide helpful error messages
+    console.error('adaptText error:', error);
+    const message = error?.message || 'Adaptation failed';
     let userMessage = 'Failed to adapt text';
-    
-    if (error.message.includes('quota')) {
+    if (message.toLowerCase().includes('quota')) {
       userMessage = 'AI quota exceeded. Please try again later.';
-    } else if (error.message.includes('network')) {
+    } else if (message.toLowerCase().includes('network')) {
       userMessage = 'Network error. Please check your connection.';
-    } else if (error.message.includes('session')) {
-      userMessage = 'AI session error. Please try again.';
+    } else if (message.toLowerCase().includes('session')) {
+      userMessage = 'AI session issue. Please try again.';
     }
-    
     return {
       success: false,
-      reason: error.message,
-      userMessage: userMessage
+      reason: message,
+      userMessage
     };
   }
 }
-
 /**
  * Truncate text at sentence boundary
  * This preserves grammar and readability
@@ -552,6 +674,8 @@ ADAPTED TEXT:`
 chrome.runtime.onSuspend.addListener(async () => {
   console.log('Extension suspending, cleaning up...');
   await cleanupSession();
+  clearSummarizerCache();
+  clearAdaptationCache();
   
   if (cleanupTimeoutId) {
     clearTimeout(cleanupTimeoutId);
@@ -562,6 +686,8 @@ chrome.runtime.onSuspend.addListener(async () => {
 self.addEventListener('beforeunload', async () => {
   console.log('Service worker terminating, cleaning up...');
   await cleanupSession();
+  clearSummarizerCache();
+  clearAdaptationCache();
 });
 
 // Periodic health check (every 10 minutes)
